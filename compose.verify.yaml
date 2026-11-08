@@ -1,0 +1,24 @@
+# Isolated HTTP test server and smoke-test runner.
+# Run only after the test database has been prepared by verify-before-github.ps1.
+services:
+  test-app:
+    build: .
+    command: ["php", "-S", "0.0.0.0:8085", "-t", "public", "public/router.php"]
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: resource_request_hub_test
+      DB_USER: resource_app
+      DB_PASSWORD: local_dev_only
+    depends_on:
+      db:
+        condition: service_healthy
+  smoke:
+    image: python:3.12-alpine
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+    command: ["python", "tests/http_smoke.py", "http://test-app:8085"]
+    depends_on:
+      test-app:
+        condition: service_started

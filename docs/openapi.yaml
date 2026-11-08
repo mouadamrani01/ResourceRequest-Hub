@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: ResourceRequest Hub API
+  version: 2.0.0
+  description: |
+    Read-only JSON API for resource requests, available inventory and analytics.
+    Authentication uses the application's PHP session cookie.
+    Requests are scoped to the current user unless their role is admin.
+servers:
+  - url: http://localhost:8080
+    description: Local Docker development
+security:
+  - sessionAuth: []
+paths:
+  /api/requests:
+    get:
+      summary: List accessible requests
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Status'
+      responses:
+        '200':
+          description: Up to 200 accessible requests, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RequestSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/requests/{id}:
+    get:
+      summary: Get a request you are allowed to view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Request details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RequestDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/resources:
+    get:
+      summary: List active resource pools and their current allocation
+      responses:
+        '200':
+          description: Active resource pools with total, allocated and available capacity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResourcePool'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/insights:
+    get:
+      summary: Group accessible requests by resource type and status
+      responses:
+        '200':
+          description: Summarized resource requests (role-scoped)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        resource_type:
+                          type: string
+                        status:
+                          $ref: '#/components/schemas/Status'
+                        count:
+                          type: integer
+                        units:
+                          type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
+  responses:
+    BadRequest:
+      description: Invalid filter value
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Login is required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Request not found or not visible
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Status:
+      type: string
+      enum: [pending, approved, rejected, cancelled, released]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    ResourcePool:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        resource_type:
+          type: string
+          enum: [CPU, GPU, Storage]
+        capacity:
+          type: integer
+        allocated:
+          type: integer
+        available:
+          type: integer
+        unit:
+          type: string
+        location:
+          type: string
+    RequestSummary:
+      type: object
+      required: [id, title, resource_type, quantity, status, created_at, requester]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        resource_type:
+          type: string
+          enum: [CPU, GPU, Storage]
+        priority:
+          type: string
+          enum: [low, normal, high]
+        pool_name:
+          type: string
+          nullable: true
+        project_name:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+        status:
+          $ref: '#/components/schemas/Status'
+        created_at:
+          type: string
+          description: MySQL UTC datetime formatted as YYYY-MM-DD HH:MM:SS
+        requester:
+          type: string
+    RequestDetail:
+      allOf:
+        - $ref: '#/components/schemas/RequestSummary'
+        - type: object
+          properties:
+            user_id:
+              type: integer
+            purpose:
+              type: string
+            resource_pool_id:
+              type: integer
+              nullable: true
+            project_id:
+              type: integer
+              nullable: true
+            needed_from:
+              type: string
+              nullable: true
+            needed_until:
+              type: string
+              nullable: true
+            review_comment:
+              type: string
+              nullable: true
+            reviewed_by:
+              type: integer
+              nullable: true
+            updated_at:
+              type: string
+            requester_email:
+              type: string

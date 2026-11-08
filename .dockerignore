@@ -1,0 +1,6 @@
+.git
+.github
+.env
+config.local.php
+*.zip
+.DS_Store

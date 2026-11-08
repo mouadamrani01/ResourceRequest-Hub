@@ -1,0 +1,24 @@
+
+# Environment variables and private configuration
+.env
+.env.*
+!.env.example
+config.local.php
+
+# Private keys and certificates
+*.pem
+*.key
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and generated files
+*.log
+coverage/
+vendor/
+node_modules/
+__pycache__/
+*.pyc

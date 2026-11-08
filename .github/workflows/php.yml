@@ -1,0 +1,53 @@
+name: Quality checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  php-and-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+          MYSQL_DATABASE: resource_request_hub_test
+          MYSQL_USER: resource_test
+          MYSQL_PASSWORD: test_password_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: resource_request_hub_test
+      DB_USER: resource_test
+      DB_PASSWORD: test_password_only
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql
+          coverage: none
+      - name: Check PHP syntax
+        run: find . -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Unit tests
+        run: php tests/run.php
+      - name: Install test schema
+        run: php scripts/install_schema.php
+      - name: Database integration tests
+        run: php tests/integration.php
+      - name: HTTP smoke tests
+        run: |
+          php -S 127.0.0.1:8085 -t public public/router.php > /tmp/resource-hub-server.log 2>&1 &
+          sleep 2
+          python3 tests/http_smoke.py http://127.0.0.1:8085
+      - name: Upload server logs on failure
+        if: failure()
+        run: cat /tmp/resource-hub-server.log || true
